@@ -8,13 +8,18 @@ import Text.ParserCombinators.Parsec as P hiding (spaces)
 import Data.Char (digitToInt)
 import Numeric (readOct, readHex)
 import Data.Functor as Functor
+import Data.Ratio ((%))
+import Data.Complex (Complex((:+)))
 
 data LispVal = Atom       String 
              | Bool       Bool
              | Character  Char
+             | Complex    (Complex Double)
              | DottedList [LispVal] LispVal -- This is called "improper list", stores a list of all elements but the last one, and the stores the last element separately.
+             | Float      Double 
              | List       [LispVal]
              | Number     Integer
+             | Rational   Rational
              | String     String
 
 -- Atom
@@ -67,13 +72,41 @@ parseNumber :: P.Parser LispVal
 parseNumber = do 
   prefix <- P.optionMaybe (P.char '#')
   case prefix of 
-    Nothing -> parseDecimal
+    Nothing -> parseDecimal <|> parseRational <|> parseComplex <|> parseFloat
     Just _ -> parsePrefixedNumber
 
 parseDecimal :: P.Parser LispVal
 parseDecimal = do 
   digits <- P.many1 P.digit
   return (Number ( read digits ))
+
+parseFloat :: P.Parser LispVal
+parseFloat = do
+  whole <- P.many1 P.digit
+  _ <- P.char '.'
+  fractional <- P.many1 P.digit
+  return $ Float (read (whole ++ "." ++ fractional))
+
+parseRational :: P.Parser LispVal
+parseRational = do
+  numerator <- P.many1 P.digit
+  _ <- P.char '/'
+  denominator <- P.many1 P.digit
+  return $ Rational (read numerator % read denominator)
+
+parseComplex :: P.Parser LispVal
+parseComplex = do 
+  realPart <- P.try parseFloat <|> parseDecimal
+  _ <- P.char '+'
+  imagPart <- P.try parseFloat <|> parseDecimal
+  _ <- P.char '-'
+  return $ case (realPart, imagPart) of 
+    (Float r, Float i) -> Complex (r :+ i)
+    (Float r, Number i) -> Complex (r :+ fromIntegral i)
+    (Number r, Float i) -> Complex (fromIntegral r :+ i)
+    (Number r, Number i) -> Complex (fromIntegral r :+ fromIntegral i)
+    (_, _) -> error "not implement"
+
 
 parsePrefixedNumber :: P.Parser LispVal
 parsePrefixedNumber = do 
