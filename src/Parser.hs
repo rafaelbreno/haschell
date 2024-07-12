@@ -1,7 +1,8 @@
 module Parser (
     LispVal(..),
     parseExpr,
-    readExpr
+    readExpr,
+    eval
 ) where
 
 import Text.ParserCombinators.Parsec as P hiding (spaces)
@@ -26,6 +27,22 @@ data LispVal = Atom             String
              | Unquote          LispVal
              | UnquoteSplicing  LispVal
              | Vector           [LispVal]
+
+instance Show LispVal where show = showVal
+
+showVal :: LispVal -> String
+showVal (String contents) = "\"" ++ contents ++ "\""
+showVal (Atom name) = name
+showVal (Number contents) = show contents
+showVal (Bool True) = "#t"
+showVal (Bool False) = "#f"
+showVal (List contents) = unwordsList contents
+showVal (DottedList h t) = "(" ++ unwordsList h ++ " . " ++ showVal t ++ ")"
+showVal _ = error "not implemented yet"
+
+unwordsList :: [LispVal] -> String
+unwordsList = unwords . map showVal
+
 
 -- Atom
 parseAtom :: P.Parser LispVal
@@ -223,7 +240,15 @@ parseExpr = parseAtom
 symbol :: P.Parser Char
 symbol = P.oneOf "!#$%&|*+-/:<=>?@^_~"
 
-readExpr :: String -> String
+readExpr :: String -> LispVal
 readExpr input = case P.parse parseExpr "lisp" input of
-  Left err -> "No match: " ++ show err
-  Right _ -> "Found a value"
+  Left err -> String $ "No match: " ++ show err
+  Right val -> val
+
+-- evaluator
+eval :: LispVal -> LispVal
+eval val@(String _) = val
+eval val@(Number _) = val
+eval val@(Bool _) = val
+eval (List [Atom "quote", val]) = val
+eval _ = error "not implemented yet"
