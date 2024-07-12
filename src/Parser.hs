@@ -10,17 +10,21 @@ import Numeric (readOct, readHex)
 import Data.Functor as Functor
 import Data.Ratio ((%))
 import Data.Complex (Complex((:+)))
+import Text.Parsec (spaces)
 
-data LispVal = Atom       String 
-             | Bool       Bool
-             | Character  Char
-             | Complex    (Complex Double)
-             | DottedList [LispVal] LispVal -- This is called "improper list", stores a list of all elements but the last one, and the stores the last element separately.
-             | Float      Double 
-             | List       [LispVal]
-             | Number     Integer
-             | Rational   Rational
-             | String     String
+data LispVal = Atom             String 
+             | Bool             Bool
+             | Character        Char
+             | Complex          (Complex Double)
+             | DottedList       [LispVal] LispVal -- This is called "improper list", stores a list of all elements but the last one, and the stores the last element separately.
+             | Float            Double 
+             | List             [LispVal]
+             | Number           Integer
+             | Rational         Rational
+             | String           String
+             | Quasinote        LispVal
+             | Unquote          LispVal
+             | UnquoteSplicing  LispVal
 
 -- Atom
 parseAtom :: P.Parser LispVal
@@ -65,6 +69,21 @@ notFollowedByAlphaNum = do
 -- DottedList
 
 -- List
+parseList :: P.Parser LispVal
+parseList = List <$> sepBy parseExpr spaces
+
+parseDottedList :: P.Parser LispVal
+parseDottedList = do 
+  h <- P.endBy parseExpr spaces -- head
+  t <- P.char '.' >> spaces >> parseExpr -- tail
+  return $ DottedList h t
+
+parseQuoted :: P.Parser LispVal
+parseQuoted = do 
+  _ <- char '\''
+  x <- parseExpr
+  return $ List [Atom "quote", x]
+
 
 -- Number
 
@@ -144,13 +163,40 @@ parseStringChar = do
     ) 
   <|> noneOf "\\\""
 
--- 
+-- Quasinote
+parseQuasinote :: P.Parser LispVal 
+parseQuasinote = do 
+  _ <- P.char '`'
+  x <- parseExpr
+  return $ List [Atom "quasinote", x]
+
+parseUnquote :: P.Parser LispVal
+parseUnquote = do 
+  _ <- P.char ','
+  x <- parseExpr
+  return $ List [Atom "unquote", x]
+
+parseUnquoteSplicing :: P.Parser LispVal
+parseUnquoteSplicing = do 
+  _ <- P.try $ P.string ",@"
+  x <- parseExpr
+  return $ List [Atom "unquote-splicing", x]
+
 
 parseExpr :: P.Parser LispVal
 parseExpr = parseAtom 
   <|> parseString
   <|> parseNumber
   <|> parseCharacter
+  <|> parseQuoted
+  <|> parseQuasinote
+  <|> parseUnquote
+  <|> parseUnquoteSplicing
+  <|> do 
+         _ <- char '('
+         x <- P.try parseList <|> parseDottedList
+         _ <- char ')'
+         return x
 
 symbol :: P.Parser Char
 symbol = P.oneOf "!#$%&|*+-/:<=>?@^_~"
