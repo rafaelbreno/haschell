@@ -25,6 +25,7 @@ data LispVal = Atom             String
              | Quasinote        LispVal
              | Unquote          LispVal
              | UnquoteSplicing  LispVal
+             | Vector           [LispVal]
 
 -- Atom
 parseAtom :: P.Parser LispVal
@@ -182,6 +183,16 @@ parseUnquoteSplicing = do
   x <- parseExpr
   return $ List [Atom "unquote-splicing", x]
 
+-- Vector
+parseVector :: P.Parser LispVal
+parseVector = do 
+  _ <- P.string "#("
+  elems <- P.sepBy parseExpr spaces
+  _ <- P.char '('
+  return $ Vector elems
+
+
+-- expr
 
 parseExpr :: P.Parser LispVal
 parseExpr = parseAtom 
@@ -192,6 +203,7 @@ parseExpr = parseAtom
   <|> parseQuasinote
   <|> parseUnquote
   <|> parseUnquoteSplicing
+  <|> parseVector
   <|> do 
          _ <- char '('
          x <- P.try parseList <|> parseDottedList
