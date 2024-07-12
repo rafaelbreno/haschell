@@ -70,14 +70,25 @@ notFollowedByAlphaNum = do
 -- DottedList
 
 -- List
-parseList :: P.Parser LispVal
-parseList = List <$> sepBy parseExpr spaces
+parseExprList :: P.Parser [LispVal]
+parseExprList = sepBy parseExpr spaces
 
-parseDottedList :: P.Parser LispVal
-parseDottedList = do 
-  h <- P.endBy parseExpr spaces -- head
-  t <- P.char '.' >> spaces >> parseExpr -- tail
-  return $ DottedList h t
+parseTail :: P.Parser (Maybe LispVal)
+parseTail = 
+  (P.char '.' >> spaces >> parseExpr >>= \expr -> return (Just expr)) 
+  <|> return Nothing
+
+-- Here `h` mean head, and `t` means tail,
+-- named them like that to avoid overwriting 
+-- `head` and `tail` built-in funcs
+makeList :: [LispVal] -> Maybe LispVal -> LispVal
+makeList h Nothing = List h
+makeList h (Just t) = DottedList h t
+
+parseListOrDottedList :: P.Parser LispVal
+parseListOrDottedList = do 
+  h <- parseExprList 
+  makeList h <$> parseTail 
 
 parseQuoted :: P.Parser LispVal
 parseQuoted = do 
@@ -191,7 +202,6 @@ parseVector = do
   _ <- P.char '('
   return $ Vector elems
 
-
 -- expr
 
 parseExpr :: P.Parser LispVal
@@ -206,7 +216,7 @@ parseExpr = parseAtom
   <|> parseVector
   <|> do 
          _ <- char '('
-         x <- P.try parseList <|> parseDottedList
+         x <- parseListOrDottedList
          _ <- char ')'
          return x
 
