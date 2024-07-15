@@ -266,6 +266,9 @@ primitives = [
   ("mod", numericBinop mod),
   ("quotient", numericBinop quot),
   ("remainder", numericBinop rem),
+  ("symbol?", isSymbol),
+  ("symbol->string", symbolToString),
+  ("string->symbol", stringToSymbol),
   ("string?", isString),
   ("number?", isNumber),
   ("boolean?", isBool),
@@ -285,8 +288,17 @@ unpackNum (Number n) = n
 --unpackNum (List [n]) = unpackNum n
 unpackNum _ = 0
 
+isSymbol :: [LispVal] -> LispVal
+isSymbol [Atom _] = Bool True
+isSymbol _ = Bool False
 
+symbolToString :: [LispVal] -> LispVal
+symbolToString [Atom s] = String s
+symbolToString _        = error "symbol->string expects a single symbol argument"
 
+stringToSymbol :: [LispVal] -> LispVal
+stringToSymbol [String s] = Atom s
+stringToSymbol _        = error "string->symbol expects a single string argument"
 
 
 isBool :: [LispVal] -> LispVal
