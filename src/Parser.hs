@@ -253,15 +253,19 @@ readExpr input = case P.parse parseExpr "lisp" input of
 eval :: LispVal -> ThrowsError LispVal
 eval val@(String _) = return val
 eval val@(Number _) = return val
-eval val@(Bool _) = return val
+eval val@(Bool _)   = return val
 eval (List [Atom "if", pre, conseq, alt]) = do 
-                                              result <- eval pre 
-                                              case result of 
-                                                Bool False -> eval alt
-                                                _          -> eval conseq
+      result <- eval pre 
+      case result of 
+        Bool False -> evalIf result conseq alt
+        _          -> E.throwError $ TypeMismatch "boolean" result
 eval (List [Atom "quote", val]) = return val
 eval (List (Atom func : args)) = mapM eval args >>= apply func
 eval badForm = E.throwError $ BadSpecialForm "Unrecognized special form" badForm
+
+evalIf :: LispVal -> LispVal -> LispVal -> ThrowsError LispVal
+evalIf (Bool False) alt _ = eval alt
+evalIf _ conseq _         = eval conseq
 
 apply :: String -> [LispVal] -> ThrowsError LispVal
 apply func args = maybe (E.throwError $ NotFunction "Unrecognized primitive function args" func)
